@@ -7,12 +7,10 @@ export interface UserInput {
   name?: string;
   gender: Gender;
   birthYear: string;   // 出生年份 (如 1990)
-  yearPillar: string;  // 年柱
-  monthPillar: string; // 月柱
-  dayPillar: string;   // 日柱
-  hourPillar: string;  // 时柱
-  startAge: string;    // 起运年龄 (虚岁) - Changed to string to handle input field state easily, parse later
-  firstDaYun: string;  // 第一步大运干支
+  birthMonth: string;  // 出生月份 (1-12)
+  birthDay: string;    // 出生日期 (1-31)
+  birthHour: string;   // 出生时辰 (0-23)
+  birthPlace: string;  // 出生地点
 }
 
 export interface KLinePoint {

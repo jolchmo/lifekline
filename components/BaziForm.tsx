@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { UserInput, Gender } from '../types';
-import { Loader2, Sparkles, AlertCircle, TrendingUp } from 'lucide-react';
+import { Loader2, Sparkles, MapPin, Calendar } from 'lucide-react';
+import { calculateBazi, HOUR_OPTIONS } from '../utils/baziCalculator';
 
 interface BaziFormProps {
   onSubmit: (data: UserInput) => void;
@@ -12,12 +13,10 @@ const BaziForm: React.FC<BaziFormProps> = ({ onSubmit, isLoading }) => {
     name: '',
     gender: Gender.MALE,
     birthYear: '',
-    yearPillar: '',
-    monthPillar: '',
-    dayPillar: '',
-    hourPillar: '',
-    startAge: '',
-    firstDaYun: '',
+    birthMonth: '',
+    birthDay: '',
+    birthHour: '12',
+    birthPlace: '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -30,40 +29,55 @@ const BaziForm: React.FC<BaziFormProps> = ({ onSubmit, isLoading }) => {
     onSubmit(formData);
   };
 
-  // Calculate direction for UI feedback
-  const daYunDirectionInfo = useMemo(() => {
-    if (!formData.yearPillar) return '等待输入年柱...';
-    
-    const firstChar = formData.yearPillar.trim().charAt(0);
-    const yangStems = ['甲', '丙', '戊', '庚', '壬'];
-    const yinStems = ['乙', '丁', '己', '辛', '癸'];
-    
-    let isYangYear = true; // default assume Yang if unknown
-    if (yinStems.includes(firstChar)) isYangYear = false;
-    
-    let isForward = false;
-    if (formData.gender === Gender.MALE) {
-      isForward = isYangYear; // Male Yang = Forward, Male Yin = Backward
-    } else {
-      isForward = !isYangYear; // Female Yin = Forward, Female Yang = Backward
+  // 实时计算八字预览
+  const baziPreview = useMemo(() => {
+    const year = parseInt(formData.birthYear);
+    const month = parseInt(formData.birthMonth);
+    const day = parseInt(formData.birthDay);
+    const hour = parseInt(formData.birthHour);
+
+    if (!year || !month || !day || isNaN(hour)) {
+      return null;
     }
-    
-    return isForward ? '顺行 (阳男/阴女)' : '逆行 (阴男/阳女)';
-  }, [formData.yearPillar, formData.gender]);
+
+    if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+      return null;
+    }
+
+    try {
+      const bazi = calculateBazi(year, month, day, hour);
+      return bazi;
+    } catch {
+      return null;
+    }
+  }, [formData.birthYear, formData.birthMonth, formData.birthDay, formData.birthHour]);
+
+  // 生成年份选项
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [];
+  for (let y = currentYear; y >= 1900; y--) {
+    yearOptions.push(y);
+  }
+
+  // 生成月份选项
+  const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  // 生成日期选项
+  const dayOptions = Array.from({ length: 31 }, (_, i) => i + 1);
 
   return (
     <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
       <div className="text-center mb-6">
         <h2 className="text-3xl font-serif-sc font-bold text-gray-800 mb-2">八字排盘</h2>
-        <p className="text-gray-500 text-sm">请输入四柱与大运信息以生成分析</p>
+        <p className="text-gray-500 text-sm">请输入出生日期时间和地点</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
         {/* Name & Gender */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-             <label className="block text-sm font-medium text-gray-700 mb-1">姓名 (可选)</label>
-             <input
+            <label className="block text-sm font-medium text-gray-700 mb-1">姓名 (可选)</label>
+            <input
               type="text"
               name="name"
               value={formData.name}
@@ -101,120 +115,127 @@ const BaziForm: React.FC<BaziFormProps> = ({ onSubmit, isLoading }) => {
           </div>
         </div>
 
-        {/* Four Pillars Manual Input */}
+        {/* Birth Date & Time */}
         <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
           <div className="flex items-center gap-2 mb-3 text-amber-800 text-sm font-bold">
-            <Sparkles className="w-4 h-4" />
-            <span>请输入四柱干支</span>
+            <Calendar className="w-4 h-4" />
+            <span>出生日期时间 (阳历)</span>
           </div>
-          
-          {/* Birth Year Input - Added as requested */}
-          <div className="mb-4">
-             <label className="block text-xs font-bold text-gray-600 mb-1">出生年份 (阳历)</label>
-             <input
-                type="number"
+
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">年</label>
+              <select
                 name="birthYear"
                 required
-                min="1900"
-                max="2100"
                 value={formData.birthYear}
                 onChange={handleChange}
-                placeholder="如: 1990"
-                className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white font-bold"
-              />
+                className="w-full px-2 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-center font-bold"
+              >
+                <option value="">选择</option>
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">月</label>
+              <select
+                name="birthMonth"
+                required
+                value={formData.birthMonth}
+                onChange={handleChange}
+                className="w-full px-2 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-center font-bold"
+              >
+                <option value="">选择</option>
+                {monthOptions.map((m) => (
+                  <option key={m} value={m}>{m}月</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-600 mb-1">日</label>
+              <select
+                name="birthDay"
+                required
+                value={formData.birthDay}
+                onChange={handleChange}
+                className="w-full px-2 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-center font-bold"
+              >
+                <option value="">选择</option>
+                {dayOptions.map((d) => (
+                  <option key={d} value={d}>{d}日</option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">年柱 (Year)</label>
-              <input
-                type="text"
-                name="yearPillar"
-                required
-                value={formData.yearPillar}
-                onChange={handleChange}
-                placeholder="如: 甲子"
-                className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-center font-serif-sc font-bold"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">月柱 (Month)</label>
-              <input
-                type="text"
-                name="monthPillar"
-                required
-                value={formData.monthPillar}
-                onChange={handleChange}
-                placeholder="如: 丙寅"
-                className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-center font-serif-sc font-bold"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">日柱 (Day)</label>
-              <input
-                type="text"
-                name="dayPillar"
-                required
-                value={formData.dayPillar}
-                onChange={handleChange}
-                placeholder="如: 戊辰"
-                className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-center font-serif-sc font-bold"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">时柱 (Hour)</label>
-              <input
-                type="text"
-                name="hourPillar"
-                required
-                value={formData.hourPillar}
-                onChange={handleChange}
-                placeholder="如: 壬戌"
-                className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white text-center font-serif-sc font-bold"
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">时辰</label>
+            <select
+              name="birthHour"
+              required
+              value={formData.birthHour}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white font-bold"
+            >
+              {HOUR_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Da Yun Manual Input */}
+        {/* Birth Place */}
         <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
           <div className="flex items-center gap-2 mb-3 text-indigo-800 text-sm font-bold">
-            <TrendingUp className="w-4 h-4" />
-            <span>大运排盘信息 (必填)</span>
+            <MapPin className="w-4 h-4" />
+            <span>出生地点</span>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">起运年龄 (虚岁)</label>
-              <input
-                type="number"
-                name="startAge"
-                required
-                min="1"
-                max="100"
-                value={formData.startAge}
-                onChange={handleChange}
-                placeholder="如: 3"
-                className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-center font-bold"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-600 mb-1">第一步大运</label>
-              <input
-                type="text"
-                name="firstDaYun"
-                required
-                value={formData.firstDaYun}
-                onChange={handleChange}
-                placeholder="如: 丁卯"
-                className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white text-center font-serif-sc font-bold"
-              />
-            </div>
-          </div>
-           <p className="text-xs text-indigo-600/70 mt-2 text-center">
-             当前大运排序规则：
-             <span className="font-bold text-indigo-900">{daYunDirectionInfo}</span>
+          <input
+            type="text"
+            name="birthPlace"
+            required
+            value={formData.birthPlace}
+            onChange={handleChange}
+            placeholder="如：北京、上海、广州"
+            className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-bold"
+          />
+          <p className="text-xs text-indigo-600/70 mt-2">
+            地点用于参考真太阳时校正
           </p>
         </div>
+
+        {/* Bazi Preview */}
+        {baziPreview && (
+          <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+            <div className="flex items-center gap-2 mb-3 text-gray-700 text-sm font-bold">
+              <Sparkles className="w-4 h-4" />
+              <span>八字预览</span>
+            </div>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="bg-white p-2 rounded-lg border border-gray-200">
+                <div className="text-xs text-gray-500 mb-1">年柱</div>
+                <div className="text-lg font-serif-sc font-bold text-gray-800">{baziPreview.yearPillar}</div>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-gray-200">
+                <div className="text-xs text-gray-500 mb-1">月柱</div>
+                <div className="text-lg font-serif-sc font-bold text-gray-800">{baziPreview.monthPillar}</div>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-gray-200">
+                <div className="text-xs text-gray-500 mb-1">日柱</div>
+                <div className="text-lg font-serif-sc font-bold text-gray-800">{baziPreview.dayPillar}</div>
+              </div>
+              <div className="bg-white p-2 rounded-lg border border-gray-200">
+                <div className="text-xs text-gray-500 mb-1">时柱</div>
+                <div className="text-lg font-serif-sc font-bold text-gray-800">{baziPreview.hourPillar}</div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              系统自动计算，AI 将进行校验和大运排盘
+            </p>
+          </div>
+        )}
 
         <button
           type="submit"
